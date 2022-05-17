@@ -258,6 +258,7 @@
                 ctx.fillRect(document.getElementById('goalX').value*tileSize-tileSize/10,document.getElementById('goalY').value*tileSize-tileSize/10,tileSize/5,tileSize/5);
                 
                 drawGrid();
+                generateMap();
             };
             draw();
             
@@ -299,9 +300,6 @@
                 document.getElementById('output').innerHTML = done;
                 document.getElementById('returnLink').href = `./raytrace.html?m=${done}`;
             };
-            
-            // Regen map every half second
-            setInterval(generateMap,500)
             
         </script>
     </body>
