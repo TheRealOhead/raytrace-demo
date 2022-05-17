@@ -5,6 +5,10 @@
     </head>
     <body>
         <canvas width="800" height="350" id="c"></canvas><br>
+        Find the golden pole!<br>
+        WASD to move<br>
+        LEFT & RIGHT arrow keys to move, or you can click the game to use mouse control<br>
+        LEFTSHIFT to run<br>
         Press I to import a map<br>
         <a href="./mapper_raytrace.html"><button>Open map editor</button></a><br>
         <canvas width="200" height="200" id="d"></canvas>
@@ -170,6 +174,17 @@
             // Set up canvas
             let c = document.getElementById('c');
             let ctx = c.getContext('2d');
+
+
+            // Handle mouse movement
+            c.requestPointerLock = c.requestPointerLock || c.mozRequestPointerLock;
+            let pointerEngaged = false;
+            c.addEventListener('click',()=>{
+                c.requestPointerLock();
+            });
+            document.addEventListener("mousemove", e=>{
+                if (document.pointerLockElement === c) player.angle += e.movementX / 3;
+            });
             
             
             // Load new map
