@@ -1,0 +1,350 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Ray Trace</title>
+    </head>
+    <body>
+        <canvas width="800" height="350" id="c"></canvas><br>
+        Press I to import a map<br>
+        <a href="./mapper_raytrace.html"><button>Open map editor</button></a><br>
+        <canvas width="200" height="200" id="d"></canvas>
+        <script>
+            // Get URL map code if there is one
+            let urlMapCode = new URLSearchParams(window.location.search).get('m');
+
+
+            var probe;
+            
+            let keys = [];
+            document.addEventListener('keydown',(e) => {
+                keys.includes(e.code) ? '' : keys.push(e.code);
+            });
+            
+            document.addEventListener('keyup',(e) => {
+                while (keys.includes(e.code)) {
+                    keys.splice(keys.indexOf(e.code),1);
+                };
+            });
+            
+            
+            
+            let sineTable = (() => {
+                let done = [];
+                for (let i = 0; i < 360 * 4; i++) {
+                    done[i] = Math.sin((i * (Math.PI / 180)) / 4);
+                };
+                return done;
+            })();
+            
+            // Uses degrees, so that I don't hurty me brain :C
+            let sin = (num) => {
+                num = num + 360 * 4;
+                num = (num * 4) % 360 * 4;
+                return sineTable[Math.floor(num)];
+            };
+            let cos = (num) => {
+                num = num + 360 * 4;
+                num = (num * 4) % 360 * 4;
+                return sineTable[(Math.floor(num) + 90) % 360];
+            };
+            
+            
+            class Color {
+                constructor(h,s,l) {
+                    this.h = h;
+                    this.s = s;
+                    this.l = l;
+                }
+                
+                toString() {
+                    return `hsl(${this.h}deg,${this.s}%,${this.l}%)`;
+                }
+                
+                makeCopy() {
+                    return new Color(this.h,this.s,this.l);
+                }
+            }
+            
+            
+            let goalPole = {
+                color:new Color(51,100,50),
+                radius:.05,
+                pos:{
+                    x:1.5,
+                    y:18.5
+                }
+            };
+
+
+            function drawLine(x1,y1,x2,y2) {
+                ctx.beginPath();
+                ctx.moveTo(x1,y1);
+                ctx.lineTo(x2,y2);
+                ctx.stroke();
+            };
+            
+            
+            
+            
+            
+            
+            // Contains all the data about the player, will probably put this in an `Entity` class later on, if this ever gets that far
+            let player = {
+                pos:{
+                    x:1.5,
+                    y:1.5
+                },
+                angle:90,
+                speed:.05,
+                sprintSpeed:.1,
+                won:false
+            };
+            
+            
+            let map = [[1,1,1,1,1,1,1,1,1,1,4,4,4,4,4,4,4,4,4,4,],[1,0,1,0,0,0,1,0,0,0,0,0,4,0,0,0,0,0,0,4,],[1,0,1,0,1,1,1,0,1,1,4,0,4,0,4,0,4,4,0,4,],[1,0,0,0,1,0,0,0,0,1,4,0,4,0,4,4,4,0,0,4,],[1,0,1,0,1,0,1,1,0,1,4,0,0,0,0,0,4,4,0,4,],[1,0,1,0,1,1,1,0,0,1,4,4,0,4,4,0,4,0,0,4,],[1,0,1,0,0,1,0,0,0,1,4,0,0,4,0,0,4,0,4,4,],[1,0,1,1,1,1,1,1,0,1,4,0,4,4,4,0,4,0,0,4,],[1,0,0,0,0,0,0,0,0,1,4,0,0,4,0,0,4,4,0,4,],[1,1,1,1,1,1,1,1,1,1,4,4,4,4,4,4,4,4,0,4,],[3,3,3,3,3,3,3,3,3,3,2,2,2,2,2,2,2,2,0,2,],[3,0,0,0,0,0,0,0,3,3,2,0,0,2,0,2,0,2,0,2,],[3,3,3,0,3,0,3,0,3,3,2,2,0,2,0,2,0,2,0,2,],[3,0,0,0,3,0,3,0,3,3,2,2,0,2,0,0,0,2,0,2,],[3,0,3,3,3,0,3,0,3,3,2,0,0,2,0,2,0,2,0,2,],[3,0,3,0,0,0,3,3,3,3,2,0,2,2,0,2,0,0,0,2,],[3,0,3,0,3,0,0,0,0,3,2,0,0,0,0,2,0,2,0,2,],[3,0,3,0,3,3,3,3,3,3,2,0,2,2,2,2,0,2,0,2,],[3,0,3,0,0,0,0,0,0,0,0,0,2,0,0,0,0,2,0,2,],[3,3,3,3,3,3,3,3,3,3,2,2,2,2,2,2,2,2,2,2,],];
+            
+            
+            // Damien's fart map
+            //let map = [[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,],[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,],[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,],[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,],[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,],[1,0,0,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,],[1,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,1,],[1,0,0,0,0,1,1,1,0,0,1,0,0,1,0,0,0,0,0,1,],[1,0,0,0,0,1,0,1,0,0,1,0,0,0,0,0,0,0,0,1,],[1,0,0,0,0,1,0,1,0,0,1,0,0,1,0,0,0,0,0,1,],[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,],[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,],[1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,],[1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,1,1,0,1,],[1,0,0,1,1,1,0,1,1,1,0,1,1,1,0,0,1,0,0,1,],[1,0,0,0,1,0,0,1,0,1,0,1,0,0,0,0,1,0,0,1,],[1,0,0,0,1,0,0,1,1,1,0,1,0,0,0,0,1,0,0,1,],[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,],[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,],[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,],];
+            
+            
+            
+            class Ray {
+                constructor(x,y,angle) {
+                    this.x = x;
+                    this.y = y;
+                    this.a = angle;
+                    
+                    this.dist = 0;
+                    this.tileHit = 0;
+                    this.hitGoalPole = false;
+                }
+                step() { // Returns `false` if it hasn't hit something, returns `true` if it has.
+                    let done = false;
+                    this.dist += 1;
+                    
+                    this.x += Math.sin(this.a * (Math.PI / 180)) * renderer.rayStepSize;//sin(this.a) * renderer.rayStepSize;
+                    this.y += Math.cos(this.a * (Math.PI / 180)) * renderer.rayStepSize;//cos(this.a) * renderer.rayStepSize;
+                    
+                    //console.log(this.x + ', ' + this.y);
+                    this.tileHit = map[Math.floor(this.x)][Math.floor(this.y)];
+                    
+                    if (this.tileHit != 0) {
+                        done = true;
+                    } else {
+                        done = false;
+                    };
+                    
+                    
+                    // Render goal pole, a little hacky
+                    if (Math.sqrt((goalPole.pos.y - this.x)**2 + (goalPole.pos.x - this.y)**2) < goalPole.radius) {
+                        done = true;
+                        this.hitGoalPole = true;
+                    };
+                    
+                    return done;
+                }
+            }
+            
+            
+            
+            
+            // Handles everything to do with rendering
+            let renderer = {
+                rayStepSize:.0025,
+                maxDist:10000,
+                fov:90, // Degrees
+                targetFov:90,
+                colors:[new Color(0,100,100),new Color(0,100,50),new Color(90,100,50),new Color(180,100,50),new Color(60,100,50)], // Each color goes to each number in the map
+                floorColor:'#550',
+                ceilColor:'#777'
+            };
+            let compass = {
+                pos:{
+                    x:20,
+                    y:20
+                },
+                length:15
+            };
+            
+            // Set up canvas
+            let c = document.getElementById('c');
+            let ctx = c.getContext('2d');
+            
+            
+            // Load new map
+            function loadMap(string) {
+                let importString = atob(string);
+                let input = '';
+                eval('input = ' + importString);
+                map = input.map;
+                player.pos = input.playerPos;
+                player.angle = input.playerAngle;
+                goalPole.pos = input.goalPos;
+                renderer.colors = input.colors;
+                player.won = false;
+            };
+            document.addEventListener('keydown',e=>{
+                if (e.key == 'i') {
+                    loadMap(prompt('Paste map string'))
+                };
+            });
+
+            // Load the URL map if present
+            if (urlMapCode) {
+                loadMap(urlMapCode);
+            };
+            
+            
+            // Rendering
+            setInterval(() => {
+                
+                // Start by drawing the ceiling and floor
+                ctx.fillStyle = renderer.floorColor;
+                ctx.fillRect(0, 0, c.width, c.height);
+                ctx.fillStyle = renderer.ceilColor;
+                ctx.fillRect(0, 0, c.width, c.height / 2);
+                    
+                
+                let iteration = 0;
+                for (let i = player.angle - renderer.fov / 2; i < player.angle + renderer.fov / 2; i++) { // For every ray, according to the FOV. `i` is the angle
+                    let ray = new Ray(player.pos.x,player.pos.y,i);
+                    
+                    // Step ray until it hits something
+                    let stepCount = 0;
+                    while (!ray.step() && stepCount < renderer.maxDist) {stepCount++};
+                    
+                    // Now draw a line to the screen
+                    let rayDistUnits = ray.dist * renderer.rayStepSize;
+                    let finalDist = rayDistUnits * .025; // Some constant, controls height of lines
+                    
+                    let color = renderer.colors[ray.tileHit].makeCopy();
+                    
+                    if (ray.hitGoalPole) {
+                        color = goalPole.color.makeCopy();
+                    };
+                    
+                    // Darken color depending on distance traveled
+                    color.l *= 2 ** (-rayDistUnits / 5);
+                    
+                    
+                    ctx.fillStyle = color;
+                    
+                    // Only do it if it's actually hit something
+                    if (ray.tileHit || ray.hitGoalPole) {
+                        ctx.fillRect(iteration * (c.width / renderer.fov) + 1, (c.height / 2) - (.5 / finalDist * 3),
+                                     c.width / renderer.fov + 1,           1 / finalDist * 3);
+                    };
+                    
+                    
+                    iteration++;
+                };
+
+                // Draw compass
+                ctx.strokeStyle = '#f00';
+                drawLine(compass.pos.x,compass.pos.y,compass.pos.x + Math.sin((player.angle + 270) * (Math.PI/180)) * compass.length,compass.pos.y + Math.cos((player.angle + 270) * (Math.PI/180)) * compass.length);
+                ctx.strokeStyle = '#000';
+                drawLine(compass.pos.x,compass.pos.y,compass.pos.x + Math.sin((player.angle + 0  ) * (Math.PI/180)) * compass.length,compass.pos.y + Math.cos((player.angle + 0  ) * (Math.PI/180)) * compass.length);
+                drawLine(compass.pos.x,compass.pos.y,compass.pos.x + Math.sin((player.angle + 90 ) * (Math.PI/180)) * compass.length,compass.pos.y + Math.cos((player.angle + 90 ) * (Math.PI/180)) * compass.length);
+                drawLine(compass.pos.x,compass.pos.y,compass.pos.x + Math.sin((player.angle + 180) * (Math.PI/180)) * compass.length,compass.pos.y + Math.cos((player.angle + 180) * (Math.PI/180)) * compass.length);
+                
+                // Increase FOV when moving
+                renderer.targetFov = 90;
+                if (keys.includes('ShiftLeft')) {
+                    renderer.targetFov = 110;
+                };
+                
+                renderer.fov = (renderer.fov + renderer.targetFov) / 2;
+                
+                
+                
+                
+                
+                
+                // Movement logic
+                
+                if (keys.includes('ArrowRight')) {
+                    player.angle+=5;
+                };
+                
+                if (keys.includes('ArrowLeft')) {
+                    player.angle-=5;
+                };
+                
+                
+                let speed = player.speed;
+                if (keys.includes('ShiftLeft')) {
+                    speed = player.sprintSpeed;
+                };
+                
+                
+                let nextPos =  {x:player.pos.x,y:player.pos.y};
+                
+                if (keys.includes('KeyW')) {
+                    nextPos.x += Math.sin(player.angle * (Math.PI / 180)) * speed;
+                    nextPos.y += Math.cos(player.angle * (Math.PI / 180)) * speed;
+                };
+                if (keys.includes('KeyS')) {
+                    nextPos.x -= Math.sin(player.angle * (Math.PI / 180)) * speed;
+                    nextPos.y -= Math.cos(player.angle * (Math.PI / 180)) * speed;
+                };
+                if (keys.includes('KeyA')) {
+                    nextPos.x -= Math.cos(player.angle * (Math.PI / 180)) * speed;
+                    nextPos.y += Math.sin(player.angle * (Math.PI / 180)) * speed;
+                };
+                if (keys.includes('KeyD')) {
+                    nextPos.x += Math.cos(player.angle * (Math.PI / 180)) * speed;
+                    nextPos.y -= Math.sin(player.angle * (Math.PI / 180)) * speed;
+                };
+                
+                // Collision
+                
+                if (!map[Math.floor(nextPos.x)][Math.floor(player.pos.y)]) {
+                    player.pos.x = nextPos.x;
+                };
+                
+                if (!map[Math.floor(player.pos.x)][Math.floor(nextPos.y)]) {
+                    player.pos.y = nextPos.y;
+                };
+                
+                // Check win state
+                if (!player.won && Math.sqrt((player.pos.x - goalPole.pos.y)**2 + (player.pos.y - goalPole.pos.x)**2) < goalPole.radius * 2) {
+                    alert('u won da game!');
+                    player.won = true;
+                    keys = []; // If I don't clear it, the player keeps moving
+                };
+                
+            },40);
+            
+            // Debug shit
+            /*
+            let d = document.getElementById('d');
+            let dtx = d.getContext('2d');
+            let dScale = 10;
+            
+            setInterval(() => {
+                
+                
+                dtx.fillStyle = '#fff';
+                dtx.fillRect(0,0,d.width,d.height);
+                
+                for (let y = 0; y < map.length; y++) {
+                    for (let x = 0; x < map[y].length; x++) {
+                        dtx.fillStyle = renderer.colors[map[y][x]];
+                        dtx.fillRect(dScale*x,dScale*y,dScale,dScale);
+                    };
+                };
+                
+                dtx.fillStyle = '#000';
+                dtx.fillRect(player.pos.y * dScale - dScale/4,player.pos.x * dScale - dScale/4,dScale/2,dScale/2);
+                dtx.beginPath();
+                dtx.moveTo(player.pos.y*dScale,player.pos.x*dScale);
+                dtx.lineTo(player.pos.y*dScale+Math.cos(player.angle * Math.PI / 180)*dScale*2,player.pos.x*dScale+Math.sin(player.angle * Math.PI / 180)*dScale*2);
+                dtx.stroke();
+            },10);
+            */
+            
+            
+        </script>
+    </body>
+</html>
