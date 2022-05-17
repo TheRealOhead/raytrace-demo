@@ -74,8 +74,7 @@
         Player Angle (degrees)<input value="0" type="number" id="playerA"><br>
         Goal X<input value="3.5" type="number" id="goalX"><br>
         Goal Y<input value="3.5" type="number" id="goalY"><br>
-        <button onclick="generateMap()">Generate Map Code</button>
-        <div id="output"></div>
+        Map code: <div id="output"></div>
         <a href="./raytrace.html" id="returnLink" target="_blank"><button>Return to game and load your map (opens in new tab)</button></a><br>
         Wanna share your level with the world? <a href="https://www.reddit.com/r/raytracemaze/">Check out the subreddit</a>!
         <script>
@@ -301,6 +300,8 @@
                 document.getElementById('returnLink').href = `./raytrace.html?m=${done}`;
             };
             
+            // Regen map every half second
+            setInterval(generateMap,500)
             
         </script>
     </body>
