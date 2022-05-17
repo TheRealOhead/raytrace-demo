@@ -76,9 +76,22 @@
         Goal Y<input value="3.5" type="number" id="goalY"><br>
         <button onclick="generateMap()">Generate Map Code</button>
         <div id="output"></div>
-        <a href="./raytrace.html" id="returnLink"><button>Return to game and load your map</button></a><br>
+        <a href="./raytrace.html" id="returnLink" target="_blank"><button>Return to game and load your map (opens in new tab)</button></a><br>
         Wanna share your level with the world? <a href="https://www.reddit.com/r/raytracemaze/">Check out the subreddit</a>!
         <script>
+
+            // Leave tab warning
+            window.onbeforeunload =  e=>{
+                e = e || window.event;
+                if (e) {
+                    e.returnValue = '';
+                };
+                return '';
+            };
+
+
+
+
             function getColorFromUser(callback) {
                 var colorInput = document.createElement('input');
                 colorInput.type = 'color';
